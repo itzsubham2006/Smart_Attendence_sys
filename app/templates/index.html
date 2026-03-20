@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <title>Smart Attendance</title>
+</head>
+<body>
+    
+<h2>Upload Class Image</h2>
+
+<form action="/upload" method="post" enctype="multipart/form-data">
+    <input type="file" name="file" required title="Upload class image">
+    <button type="submit">Mark Attendance</button>
+</form>
+
+<br>
+
+<a href="/download/csv">Download CSV</a><br>
+<a href="/download/excel">Download Excel</a><br>
+<a href="/download/pdf">Download PDF</a>
+    
+</body>
+</html>
+
+
