@@ -4,10 +4,16 @@ import os
 from app.services.recognition_service import recognize_faces
 from app.services.export_service import export_all
 
+from app.scripts.augment_dataset import process_dataset
+from app.scripts.generate_embeddings import generate_embeddings
+
 app = Flask(__name__)
 
 UPLOAD_FOLDER = "uploads"
+EMBEDDINGS_FILE = "embeddings/embeddings.pkl"
+
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
 
 @app.route("/")
 def home():
@@ -21,19 +27,36 @@ def upload():
     if not file:
         return render_template("index.html", results=None, message="No file uploaded")
 
+ 
     path = os.path.join(UPLOAD_FOLDER, file.filename)
     file.save(path)
 
-    attendance = recognize_faces(path)
+    
+    if not os.path.exists(EMBEDDINGS_FILE):
+        print("Embeddings not found. Running full pipeline...")
+
+        
+        process_dataset()
+
+        
+        generate_embeddings()
+
+    
+    attendance, output_image = recognize_faces(path)
 
    
     if attendance:
         export_all(attendance)
         message = "Attendance marked successfully"
     else:
-        message = " No known faces recognized"
+        message = "No known faces recognized"
 
-    return render_template("index.html", results=attendance, message=message)
+    return render_template(
+    "index.html",
+    results=attendance,
+    message=message,
+    image=output_image
+)
 
 
 @app.route("/download/csv")

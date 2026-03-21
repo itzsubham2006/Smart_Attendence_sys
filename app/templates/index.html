@@ -3,9 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     
     <title>Smart Attendance</title>
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
 
@@ -13,36 +14,86 @@
 
    
     <form action="/upload" method="post" enctype="multipart/form-data">
-     <input type="file" name="file" required title="Upload class image">
+        <input type="file" name="file" required title="Upload class image">
         <button type="submit">Upload</button>
     </form>
 
-    
+  
     {% if message %}
-        <p>{{ message }}</p>
+        <p class="message">{{ message }}</p>
     {% endif %}
 
-  
+
     {% if results %}
     <div class="table-container">
-        <h2>Attendance</h2>
-        <table>
-            <tr>
-                <th>Name</th>
-                <th>Roll</th>
-                <th>Confidence</th>
-            </tr>
+        <h2>Attendance Results</h2>
 
-            {% for r in results %}
-            <tr>
-                <td>{{ r.name }}</td>
-                <td>{{ r.roll }}</td>
-                <td>{{ "%.2f"|format(r.confidence) }}</td>
-            </tr>
-            {% endfor %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Face ID</th>
+                    <th>Name</th>
+                    <th>Roll</th>
+                    <th>Confidence</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                {% for r in results %}
+                <tr>
+                    <td>{{ r.face_id }}</td>
+
+                    <td>
+                        {% if r.name == "Unknown" %}
+                            ❌ Unknown
+                        {% else %}
+                            {{ r.name }}
+                        {% endif %}
+                    </td>
+
+                    <td>
+                        {% if r.roll %}
+                            {{ r.roll }}
+                        {% else %}
+                            -
+                        {% endif %}
+                    </td>
+
+                    <td>{{ "%.2f"|format(r.confidence) }}%</td>
+
+                    <td>
+                        {% if r.name == "Unknown" %}
+                            ❌ Not Marked
+                        {% else %}
+                            ✅ Present
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
         </table>
     </div>
     {% endif %}
+
+    
+    {% if image %}
+    <div class="image-container">
+        <h2>📷 Detected Faces</h2>
+        <img 
+            src="{{ image }}" 
+            class="result-image" 
+            alt="Detected faces with bounding boxes showing recognized students"
+        >
+    </div>
+    {% endif %}
+
+    <!-- Download
+    <div class="download-section">
+        <a href="/download/csv"><button type="button">Download CSV</button></a>
+        <a href="/download/excel"><button type="button">Download Excel</button></a>
+        <a href="/download/pdf"><button type="button">Download PDF</button></a>
+    </div>
 
 </body>
 </html>

@@ -65,3 +65,19 @@ tr:hover {
 
 
 
+/* Message text */
+.message {
+    font-weight: bold;
+}
+
+/* Output image */
+.result-image {
+    width: 600px;
+    border: 2px solid black;
+    margin-top: 20px;
+}
+
+/* Container for image */
+.image-container {
+    margin-top: 20px;
+}
