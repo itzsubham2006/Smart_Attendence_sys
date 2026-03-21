@@ -14,4 +14,4 @@ def build_faiss_index():
 
     faiss.write_index(index, os.path.join(EMBEDDINGS_PATH, "faiss_index.bin"))
 
-    print("✅ FAISS index created!")
+    print("FAISS index created!")
