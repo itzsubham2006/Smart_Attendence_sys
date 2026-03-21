@@ -4,24 +4,45 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    
     <title>Smart Attendance</title>
 </head>
 <body>
+
+    <h1>Smart Attendance System</h1>
+
+   
+    <form action="/upload" method="post" enctype="multipart/form-data">
+     <input type="file" name="file" required title="Upload class image">
+        <button type="submit">Upload</button>
+    </form>
+
     
-<h2>Upload Class Image</h2>
+    {% if message %}
+        <p>{{ message }}</p>
+    {% endif %}
 
-<form action="/upload" method="post" enctype="multipart/form-data">
-    <input type="file" name="file" required title="Upload class image">
-    <button type="submit">Mark Attendance</button>
-</form>
+  
+    {% if results %}
+    <div class="table-container">
+        <h2>Attendance</h2>
+        <table>
+            <tr>
+                <th>Name</th>
+                <th>Roll</th>
+                <th>Confidence</th>
+            </tr>
 
-<br>
+            {% for r in results %}
+            <tr>
+                <td>{{ r.name }}</td>
+                <td>{{ r.roll }}</td>
+                <td>{{ "%.2f"|format(r.confidence) }}</td>
+            </tr>
+            {% endfor %}
+        </table>
+    </div>
+    {% endif %}
 
-<a href="/download/csv">Download CSV</a><br>
-<a href="/download/excel">Download Excel</a><br>
-<a href="/download/pdf">Download PDF</a>
-    
 </body>
 </html>
-
-

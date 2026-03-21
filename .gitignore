@@ -1,4 +1,14 @@
 # ignore venv (virtual environment)
-__pycache__/
+
 *.pyc
+
 venv/
+
+__pycache__
+
+
+dataset/
+
+app/models
+
+uploads

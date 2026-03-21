@@ -39,18 +39,18 @@ for person in os.listdir(DATASET_PATH):
         except Exception as e:
             print(f"❌ Error with {img_name}: {e}")
 
-# Convert to numpy
+
 embeddings = np.array(embeddings).astype("float32")
 
-# Create FAISS index
+
 dimension = embeddings.shape[1]
 index = faiss.IndexFlatL2(dimension)
 index.add(embeddings)
 
-# Save index
+
 faiss.write_index(index, os.path.join(EMBEDDINGS_PATH, "faiss_index.bin"))
 
-# Save labels
+
 with open(os.path.join(EMBEDDINGS_PATH, "labels.pkl"), "wb") as f:
     pickle.dump(labels, f)
 

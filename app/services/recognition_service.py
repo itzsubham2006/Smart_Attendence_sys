@@ -6,18 +6,24 @@ from deepface import DeepFace
 EMBEDDINGS_PATH = "embeddings"
 
 index_path = os.path.join(EMBEDDINGS_PATH, "faiss_index.bin")
+labels_path = os.path.join(EMBEDDINGS_PATH, "labels.npy")
 
-if os.path.exists(index_path):
+if os.path.exists(index_path) and os.path.exists(labels_path):
     index = faiss.read_index(index_path)
+    labels = np.load(labels_path)
 else:
-    print("⚠️ FAISS index not found. Please train model first.")
+    print(" Model not trained yet. Run embedding script first.")
     index = None
-labels = np.load(os.path.join(EMBEDDINGS_PATH, "labels.npy"))
-
+    labels = None
 
 THRESHOLD = 0.4
 
+
 def recognize_faces(image_path):
+    if index is None or labels is None:
+        print("Recognition system not ready.")
+        return []
+
     results = []
 
     faces = DeepFace.extract_faces(
@@ -31,12 +37,13 @@ def recognize_faces(image_path):
                 continue
 
             embedding = DeepFace.represent(
-                img_path=face["face"],
+                img_path=None,
+                img=face["face"],
                 model_name="ArcFace",
                 enforce_detection=False
             )[0]["embedding"]
 
-            query = np.array([embedding])
+            query = np.array([embedding]).astype("float32")
 
             D, I = index.search(query, k=1)
 
