@@ -29,7 +29,7 @@ def generate_embeddings():
             try:
                 embedding = DeepFace.represent(
                     img_path=img_path,
-                    model_name="Facenet",  
+                    model_name="Facenet512",  
                     enforce_detection=True
                 )[0]["embedding"]
 

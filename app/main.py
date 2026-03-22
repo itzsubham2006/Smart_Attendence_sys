@@ -1,16 +1,18 @@
 from flask import Flask, request, render_template, send_file
 import os
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
 from app.services.recognition_service import recognize_faces
 from app.services.export_service import export_all
 
-from app.scripts.augment_dataset import process_dataset
+# from app.scripts.augment_dataset import process_dataset
 from app.scripts.generate_embeddings import generate_embeddings
 
 app = Flask(__name__)
 
 UPLOAD_FOLDER = "uploads"
-EMBEDDINGS_FILE = "embeddings/embeddings.pkl"
+FAISS_INDEX = "embeddings/faiss_index.bin"
+LABELS_FILE = "embeddings/labels.pkl"
 
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
@@ -31,15 +33,19 @@ def upload():
     path = os.path.join(UPLOAD_FOLDER, file.filename)
     file.save(path)
 
-    
-    if not os.path.exists(EMBEDDINGS_FILE):
+    if not (os.path.exists(FAISS_INDEX) and os.path.exists(LABELS_FILE)):
         print("Embeddings not found. Running full pipeline...")
-
-        
-        process_dataset()
-
-        
         generate_embeddings()
+    else:
+        print("Embeddings already exist ✅")
+    # if not os.path.exists(EMBEDDINGS_FILE):
+    #     print("Embeddings not found. Running full pipeline...")
+
+        
+    #     # process_dataset()
+
+        
+    #     generate_embeddings()
 
     
     attendance, output_image = recognize_faces(path)
@@ -84,4 +90,4 @@ def pdf():
 
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(debug=True, use_reloader=False)

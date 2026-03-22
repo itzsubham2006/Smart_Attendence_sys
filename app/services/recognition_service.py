@@ -4,21 +4,22 @@ import numpy as np
 import pickle
 import faiss
 from deepface import DeepFace
+import traceback
 
 EMBEDDINGS_PATH = "embeddings"
 OUTPUT_PATH = "static/output"
-THRESHOLD = 0.5
+THRESHOLD = 0.6
 
 os.makedirs(OUTPUT_PATH, exist_ok=True)
 
+print("🔄 Loading FAISS model...")
 
-def load_model():
-    index = faiss.read_index(os.path.join(EMBEDDINGS_PATH, "faiss_index.bin"))
+index = faiss.read_index(os.path.join(EMBEDDINGS_PATH, "faiss_index.bin"))
 
-    with open(os.path.join(EMBEDDINGS_PATH, "labels.pkl"), "rb") as f:
-        labels = pickle.load(f)
+with open(os.path.join(EMBEDDINGS_PATH, "labels.pkl"), "rb") as f:
+    labels = pickle.load(f)
 
-    return index, labels
+print("✅ Model loaded successfully")
 
 
 def distance_to_confidence(distance):
@@ -26,7 +27,7 @@ def distance_to_confidence(distance):
 
 
 def recognize_faces(image_path):
-    index, labels = load_model()
+    global index, labels
 
     img = cv2.imread(image_path)
 
@@ -51,16 +52,33 @@ def recognize_faces(image_path):
 
             x, y, w, h = region["x"], region["y"], region["w"], region["h"]
 
+          
+            if w < 50 or h < 50:
+                print(f"⚠️ Skipping small face {i}")
+                continue
+
+        
             face = (face * 255).astype("uint8")
 
-            try:
-                embedding = DeepFace.represent(
-                    img_path=face,
-                    model_name="Facenet",
-                    enforce_detection=False
-                )[0]["embedding"]
 
-                embedding = np.array(embedding).astype("float32")
+           
+        
+
+            try:
+             
+                rep = DeepFace.represent(
+                    img_path=face,
+                    model_name="Facenet512",
+                    enforce_detection=False
+                )
+
+                if not rep or "embedding" not in rep[0]:
+                    print(f"⚠️ Skipping face {i} (no embedding)")
+                    
+                    continue
+
+                embedding = np.array(rep[0]["embedding"]).astype("float32")
+
                 faiss.normalize_L2(embedding.reshape(1, -1))
 
                 D, I = index.search(embedding.reshape(1, -1), k=1)
@@ -68,7 +86,7 @@ def recognize_faces(image_path):
                 distance = D[0][0]
                 idx = I[0][0]
 
-                if distance < THRESHOLD:
+                if distance > THRESHOLD:
                     full_name = labels[idx]
 
                     parts = full_name.split("_")
@@ -77,12 +95,11 @@ def recognize_faces(image_path):
 
                     confidence = distance_to_confidence(distance)
 
-                   
                     if roll in seen:
                         continue
                     seen.add(roll)
 
-                    color = (0, 255, 0)  
+                    color = (0, 255, 0)
                     label = f"{student_name} ({confidence}%)"
 
                 else:
@@ -90,13 +107,12 @@ def recognize_faces(image_path):
                     roll = "-"
                     confidence = 0
 
-                    color = (0, 0, 255)  
+                    color = (0, 0, 255)
                     label = "Unknown"
 
-            
+                # Draw
                 cv2.rectangle(img, (x, y), (x + w, y + h), color, 2)
 
-                
                 cv2.putText(
                     img,
                     label,
@@ -115,13 +131,17 @@ def recognize_faces(image_path):
                 })
 
             except Exception as e:
-                print(f"Error processing face {i}: {e}")
+                print(f"⚠️ Skipping face {i}")
+                traceback.print_exc()
+
 
     except Exception as e:
         print("Face detection failed:", e)
 
-    
+
     output_file = os.path.join(OUTPUT_PATH, "result.jpg")
     cv2.imwrite(output_file, img)
 
-    return results, output_file
+    print("Results:", results)
+
+    return results, "static/output/result.jpg"
