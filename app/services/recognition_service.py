@@ -1,147 +1,120 @@
 import os
 import cv2
-import numpy as np
 import pickle
+import numpy as np
 import faiss
 from deepface import DeepFace
-import traceback
 
-EMBEDDINGS_PATH = "embeddings"
-OUTPUT_PATH = "static/output"
-THRESHOLD = 0.6
+INDEX_PATH = "embeddings/faiss_index.bin"
+LABELS_PATH = "embeddings/labels.pkl"
+OUTPUT_IMAGE_PATH = "static/output/result.jpg"
 
-os.makedirs(OUTPUT_PATH, exist_ok=True)
+MODEL_NAME = "ArcFace"
+DETECTOR_BACKEND = "retinaface"
+ENFORCE_DETECTION = True
+ALIGN = True
+NORMALIZATION = "ArcFace"
 
-print("🔄 Loading FAISS model...")
-
-index = faiss.read_index(os.path.join(EMBEDDINGS_PATH, "faiss_index.bin"))
-
-with open(os.path.join(EMBEDDINGS_PATH, "labels.pkl"), "rb") as f:
-    labels = pickle.load(f)
-
-print("✅ Model loaded successfully")
+# Tune between 0.35 and 0.45 based on your classroom data
+COSINE_THRESHOLD = 0.40
 
 
-def distance_to_confidence(distance):
-    return round(max(0, (1 - distance)) * 100, 2)
+def _load_index_and_labels():
+    if not os.path.exists(INDEX_PATH):
+        raise FileNotFoundError(f"Missing index: {INDEX_PATH}")
+    if not os.path.exists(LABELS_PATH):
+        raise FileNotFoundError(f"Missing labels: {LABELS_PATH}")
+
+    index = faiss.read_index(INDEX_PATH)
+    with open(LABELS_PATH, "rb") as f:
+        labels = pickle.load(f)
+
+    if index.ntotal != len(labels):
+        raise ValueError("Index and labels mismatch. Re-run embeddings generation.")
+
+    return index, labels
 
 
-def recognize_faces(image_path):
-    global index, labels
+def recognize_faces(image_path, threshold=COSINE_THRESHOLD):
+    """
+    Returns:
+      results: list[dict] per-face recognition details
+      present_students: list[str] unique recognized student names
+      output_image_path: str path for template image src
+    """
+    index, labels = _load_index_and_labels()
 
-    img = cv2.imread(image_path)
+    image = cv2.imread(image_path)
+    if image is None:
+        raise ValueError(f"Could not read image: {image_path}")
 
-    if img is None:
-        return [], None
+    # Detect all faces + generate embeddings
+    faces = DeepFace.represent(
+        img_path=image_path,
+        model_name=MODEL_NAME,
+        detector_backend=DETECTOR_BACKEND,
+        enforce_detection=ENFORCE_DETECTION,
+        align=ALIGN,
+        normalization=NORMALIZATION
+    )
 
+    present_set = set()
     results = []
-    seen = set()
 
-    try:
-        detections = DeepFace.extract_faces(
-            img_path=image_path,
-            detector_backend="retinaface",
-            enforce_detection=False
+    for face in faces:
+        emb = np.asarray(face["embedding"], dtype=np.float32).reshape(1, -1)
+        faiss.normalize_L2(emb)
+
+        scores, indices = index.search(emb, 1)
+        similarity = float(scores[0][0])
+        best_idx = int(indices[0][0])
+
+        face_confidence = float(face.get("face_confidence", 0.0))
+
+        if best_idx >= 0 and similarity >= threshold:
+            name = labels[best_idx]
+            status = "Present"
+            present_set.add(name)
+            color = (0, 255, 0)
+        else:
+            name = "Unknown"
+            status = "Unknown"
+            color = (0, 0, 255)
+
+        area = face.get("facial_area", {})
+        x = int(area.get("x", 0))
+        y = int(area.get("y", 0))
+        w = int(area.get("w", 0))
+        h = int(area.get("h", 0))
+
+        cv2.rectangle(image, (x, y), (x + w, y + h), color, 2)
+        cv2.putText(
+            image,
+            f"{name} {similarity:.2f}",
+            (x, max(20, y - 8)),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.6,
+            color,
+            2,
+            cv2.LINE_AA
         )
 
-        print(f"Detected {len(detections)} faces")
+        results.append(
+            {
+                "face_id": len(results) + 1,
+                "name": name,
+                "status": status,
+                "similarity": round(similarity, 4),
+                "confidence": round(face_confidence * 100.0, 2),
+                "x": x,
+                "y": y,
+                "w": w,
+                "h": h,
+            }
+        )
 
-        for i, face_data in enumerate(detections):
-            face = face_data["face"]
-            region = face_data["facial_area"]
+    os.makedirs(os.path.dirname(OUTPUT_IMAGE_PATH), exist_ok=True)
+    cv2.imwrite(OUTPUT_IMAGE_PATH, image)
 
-            x, y, w, h = region["x"], region["y"], region["w"], region["h"]
-
-          
-            if w < 50 or h < 50:
-                print(f"⚠️ Skipping small face {i}")
-                continue
-
-        
-            face = (face * 255).astype("uint8")
-
-
-           
-        
-
-            try:
-             
-                rep = DeepFace.represent(
-                    img_path=face,
-                    model_name="Facenet512",
-                    enforce_detection=False
-                )
-
-                if not rep or "embedding" not in rep[0]:
-                    print(f"⚠️ Skipping face {i} (no embedding)")
-                    
-                    continue
-
-                embedding = np.array(rep[0]["embedding"]).astype("float32")
-
-                faiss.normalize_L2(embedding.reshape(1, -1))
-
-                D, I = index.search(embedding.reshape(1, -1), k=1)
-
-                distance = D[0][0]
-                idx = I[0][0]
-
-                if distance > THRESHOLD:
-                    full_name = labels[idx]
-
-                    parts = full_name.split("_")
-                    student_name = parts[0]
-                    roll = parts[1] if len(parts) > 1 else "N/A"
-
-                    confidence = distance_to_confidence(distance)
-
-                    if roll in seen:
-                        continue
-                    seen.add(roll)
-
-                    color = (0, 255, 0)
-                    label = f"{student_name} ({confidence}%)"
-
-                else:
-                    student_name = "Unknown"
-                    roll = "-"
-                    confidence = 0
-
-                    color = (0, 0, 255)
-                    label = "Unknown"
-
-                # Draw
-                cv2.rectangle(img, (x, y), (x + w, y + h), color, 2)
-
-                cv2.putText(
-                    img,
-                    label,
-                    (x, y - 10),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.6,
-                    color,
-                    2
-                )
-
-                results.append({
-                    "name": student_name,
-                    "roll": roll,
-                    "confidence": confidence,
-                    "face_id": i
-                })
-
-            except Exception as e:
-                print(f"⚠️ Skipping face {i}")
-                traceback.print_exc()
-
-
-    except Exception as e:
-        print("Face detection failed:", e)
-
-
-    output_file = os.path.join(OUTPUT_PATH, "result.jpg")
-    cv2.imwrite(output_file, img)
-
-    print("Results:", results)
-
-    return results, "static/output/result.jpg"
+    present_students = sorted(list(present_set))
+    return results, present_students, f"/{OUTPUT_IMAGE_PATH}"

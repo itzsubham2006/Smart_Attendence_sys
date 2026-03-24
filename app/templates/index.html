@@ -27,14 +27,15 @@
     {% if results %}
     <div class="table-container">
         <h2>Attendance Results</h2>
+        <p class="message">Total faces detected: {{ results|length }} | Present marked: {{ present_count or 0 }}</p>
 
         <table>
             <thead>
                 <tr>
                     <th>Face ID</th>
                     <th>Name</th>
-                    <th>Roll</th>
-                    <th>Confidence</th>
+                    <th>Detector Confidence</th>
+                    <th>Similarity</th>
                     <th>Status</th>
                 </tr>
             </thead>
@@ -52,18 +53,11 @@
                         {% endif %}
                     </td>
 
-                    <td>
-                        {% if r.roll %}
-                            {{ r.roll }}
-                        {% else %}
-                            -
-                        {% endif %}
-                    </td>
-
                     <td>{{ "%.2f"|format(r.confidence) }}%</td>
+                    <td>{{ "%.2f"|format(r.similarity * 100) }}%</td>
 
                     <td>
-                        {% if r.name == "Unknown" %}
+                        {% if r.status == "Unknown" %}
                             ❌ Not Marked
                         {% else %}
                             ✅ Present
