@@ -1,155 +1,347 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Smart Attendance System</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Attendace &mdash; AI Attendance</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700;14..32,800&display=swap" rel="stylesheet" />
+    <style>
+        *,
+        *::before,
+        *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --bg: #07070d;
+            --surface: #0b0b14;
+            --card: #0f0f1a;
+            --card-border: rgba(255, 255, 255, 0.04);
+            --input-bg: rgba(255, 255, 255, 0.03);
+            --input-border: rgba(255, 255, 255, 0.06);
+            --text: #e8ecf4;
+            --text-dim: rgba(180, 195, 220, 0.55);
+            --accent: #00b4ff;
+            --accent-glow: rgba(0, 180, 255, 0.15);
+            --accent-gradient: linear-gradient(135deg, #00b4ff, #0066ff);
+            --red: #ff4757;
+            --green: #2ed573;
+            --radius: 10px;
+            --radius-sm: 6px;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow-x: hidden;
+            line-height: 1.5;
+        }
+
+        .bg-grid {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 0; pointer-events: none;
+            background-image:
+                linear-gradient(rgba(255,255,255,0.012) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255,255,255,0.012) 1px, transparent 1px);
+            background-size: 48px 48px;
+        }
+
+        .bg-glow {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 0; pointer-events: none;
+        }
+        .bg-glow::before {
+            content: ''; position: absolute; top: -20%; left: 50%;
+            transform: translateX(-50%);
+            width: 700px; height: 500px;
+            background: radial-gradient(ellipse, rgba(0,120,255,0.05) 0%, transparent 65%);
+        }
+        .bg-glow::after {
+            content: ''; position: absolute; bottom: -10%; right: -5%;
+            width: 500px; height: 400px;
+            background: radial-gradient(ellipse, rgba(100,50,255,0.03) 0%, transparent 60%);
+        }
+
+        .container {
+            position: relative; z-index: 1;
+            width: 100%; max-width: 440px; padding: 24px;
+        }
+
+        .brand { text-align: center; margin-bottom: 36px; }
+        .brand-icon {
+            width: 44px; height: 44px; border-radius: 12px;
+            background: var(--accent-gradient);
+            display: inline-flex; align-items: center; justify-content: center;
+            font-size: 1.2rem; font-weight: 700; color: #fff;
+            box-shadow: 0 8px 32px var(--accent-glow);
+            margin-bottom: 16px;
+        }
+        .brand h1 { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.03em; color: var(--text); }
+        .brand p { font-size: 0.85rem; color: var(--text-dim); margin-top: 6px; font-weight: 400; }
+
+        .card {
+            background: var(--card); border: 1px solid var(--card-border);
+            border-radius: 14px; padding: 32px 28px 28px;
+            box-shadow: 0 2px 40px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.02);
+            position: relative; overflow: hidden;
+        }
+        .card::before {
+            content: ''; position: absolute; top: 0; left: 50%;
+            transform: translateX(-50%);
+            width: 120px; height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(0,180,255,0.2), transparent);
+        }
+        .card-title { font-size: 1.1rem; font-weight: 600; text-align: center; margin-bottom: 4px; }
+        .card-sub { font-size: 0.8rem; color: var(--text-dim); text-align: center; margin-bottom: 24px; }
+
+        .drop-zone {
+            position: relative;
+            border: 1.5px dashed var(--input-border); border-radius: var(--radius);
+            padding: 28px 20px; text-align: center; cursor: pointer;
+            transition: all 0.25s ease; background: var(--input-bg);
+        }
+        .drop-zone:hover, .drop-zone.dragover { border-color: rgba(0,180,255,0.2); background: rgba(0,180,255,0.02); }
+        .drop-zone .dz-icon { font-size: 1.6rem; opacity: 0.35; margin-bottom: 8px; display: block; }
+        .drop-zone .dz-text { font-size: 0.82rem; color: var(--text-dim); }
+        .drop-zone .dz-text .link { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; font-weight: 500; }
+        .drop-zone .dz-hint { font-size: 0.7rem; color: var(--text-dim); opacity: 0.5; margin-top: 4px; }
+        .drop-zone input[type="file"] { position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+
+        .file-chip { display: none; align-items: center; gap: 8px; margin-top: 12px; padding: 8px 14px; background: rgba(0,180,255,0.04); border: 1px solid rgba(0,180,255,0.08); border-radius: var(--radius-sm); font-size: 0.8rem; color: var(--accent); }
+        .file-chip.visible { display: inline-flex; }
+        .file-chip .close { margin-left: auto; cursor: pointer; opacity: 0.4; transition: opacity 0.2s; background: none; border: none; color: var(--text-dim); font-size: 0.9rem; padding: 0 2px; }
+        .file-chip .close:hover { opacity: 1; }
+
+        .btn-submit {
+            width: 100%; margin-top: 16px; padding: 12px; border-radius: var(--radius-sm);
+            background: var(--accent-gradient); color: #fff; font-weight: 600; font-size: 0.9rem;
+            border: none; cursor: pointer; transition: all 0.25s ease;
+            box-shadow: 0 4px 20px var(--accent-glow);
+            opacity: 0.5; pointer-events: none;
+        }
+        .btn-submit.active { opacity: 1; pointer-events: auto; }
+        .btn-submit.active:hover { box-shadow: 0 6px 32px rgba(0,180,255,0.25); transform: translateY(-1px); }
+
+        .loader { display: none; text-align: center; padding: 20px 0 4px; }
+        .loader.visible { display: block; }
+        .loader-ring { width: 32px; height: 32px; border-radius: 50%; border: 2.5px solid rgba(0,180,255,0.06); border-top-color: var(--accent); animation: spin 0.8s linear infinite; margin: 0 auto; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .loader .lt { font-size: 0.82rem; color: var(--text-dim); margin-top: 10px; }
+        .loader .ls { font-size: 0.7rem; color: var(--text-dim); opacity: 0.4; margin-top: 2px; }
+
+        .msg { display: none; padding: 10px 14px; border-radius: var(--radius-sm); font-size: 0.8rem; margin-top: 16px; font-weight: 500; }
+        .msg.visible { display: block; }
+        .msg.success { background: rgba(46,213,115,0.04); border: 1px solid rgba(46,213,115,0.08); color: var(--green); }
+        .msg.error { background: rgba(255,71,87,0.04); border: 1px solid rgba(255,71,87,0.08); color: var(--red); }
+        .msg.info { background: rgba(255,180,0,0.04); border: 1px solid rgba(255,180,0,0.08); color: #ffc107; }
+
+        .results { display: none; margin-top: 24px; border-top: 1px solid var(--card-border); padding-top: 20px; }
+        .results.visible { display: block; }
+
+        .results-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+        .results-header h3 { font-size: 0.85rem; font-weight: 600; }
+        .results-header .count { font-size: 0.7rem; padding: 2px 10px; border-radius: 100px; background: rgba(0,180,255,0.06); color: var(--accent); font-weight: 500; }
+
+        .results-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+        .results-table thead th { text-align: left; padding: 8px 6px 8px 0; font-weight: 500; color: var(--text-dim); font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.06em; border-bottom: 1px solid var(--card-border); }
+        .results-table tbody td { padding: 8px 6px 8px 0; border-bottom: 1px solid rgba(255,255,255,0.015); vertical-align: middle; }
+        .results-table tbody tr:last-child td { border-bottom: none; }
+
+        .status-badge { display: inline-block; padding: 1px 10px; border-radius: 100px; font-size: 0.68rem; font-weight: 600; }
+        .status-badge.present { background: rgba(46,213,115,0.06); color: var(--green); }
+        .status-badge.unknown { background: rgba(255,71,87,0.06); color: var(--red); }
+
+        .sim-bar { display: inline-flex; align-items: center; gap: 6px; }
+        .sim-track { width: 48px; height: 3px; border-radius: 2px; background: rgba(255,255,255,0.04); overflow: hidden; }
+        .sim-fill { height: 100%; border-radius: 2px; background: var(--accent-gradient); }
+        .sim-pct { font-size: 0.7rem; color: var(--text-dim); }
+
+        .results-summary { display: flex; justify-content: space-between; padding-top: 12px; margin-top: 12px; border-top: 1px solid var(--card-border); font-size: 0.75rem; color: var(--text-dim); }
+        .results-summary strong { color: var(--text); }
+
+        .image-wrap { margin-top: 16px; border-radius: var(--radius-sm); overflow: hidden; background: #000; border: 1px solid var(--card-border); display: none; }
+        .image-wrap.visible { display: block; }
+        .image-wrap img { width: 100%; height: auto; display: block; }
+
+        .downloads { display: none; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 14px; }
+        .downloads.visible { display: grid; }
+        .btn-dl { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 10px; border-radius: var(--radius-sm); background: var(--input-bg); border: 1px solid var(--input-border); color: var(--text-dim); font-size: 0.78rem; font-weight: 500; text-decoration: none; transition: all 0.2s ease; }
+        .btn-dl:hover { background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.08); color: var(--text); }
+
+        .sep { height: 1px; background: var(--card-border); margin: 16px 0 14px; }
+        .footer { text-align: center; margin-top: 24px; font-size: 0.7rem; color: var(--text-dim); opacity: 0.35; }
+    </style>
 </head>
-<body class="bg-gradient-to-br from-gray-900 via-slate-800 to-gray-900 min-h-screen text-gray-100">
-    <div class="container mx-auto px-4 py-8 max-w-6xl">
-        <header class="text-center mb-10">
-            <h1 class="text-4xl font-bold bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">
-                Smart Attendance System
-            </h1>
-            <p class="text-gray-400 mt-2">Upload a class photo to automatically mark attendance</p>
-        </header>
+<body>
 
-        <div class="bg-white/5 backdrop-blur-sm rounded-2xl p-8 border border-white/10 shadow-xl mb-8">
-            <form action="/upload" method="post" enctype="multipart/form-data" class="flex flex-col sm:flex-row gap-4 items-center justify-center">
-                <label class="flex-1 max-w-md w-full">
-                    <div class="relative">
-                        <input type="file" name="file" required accept="image/*"
-                               class="block w-full text-sm text-gray-300 file:mr-4 file:py-2.5 file:px-6 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-emerald-500 file:text-white hover:file:bg-emerald-400 file:cursor-pointer file:transition-all cursor-pointer bg-white/5 rounded-xl border border-white/10 p-2">
-                    </div>
-                </label>
-                <button type="submit" id="submitBtn"
-                        class="bg-emerald-500 hover:bg-emerald-400 text-white font-semibold py-2.5 px-8 rounded-xl transition-all hover:scale-105 active:scale-95 shadow-lg shadow-emerald-500/25">
-                    Upload & Process
-                </button>
-            </form>
-        </div>
+<div class="bg-grid"></div>
+<div class="bg-glow"></div>
 
-        <div id="loading" class="hidden text-center py-12">
-            <div class="inline-block animate-spin rounded-full h-12 w-12 border-4 border-emerald-400 border-t-transparent mb-4"></div>
-            <p class="text-emerald-400 text-lg font-medium">Processing image...</p>
-            <p class="text-gray-500 text-sm mt-1">This may take 10-30 seconds depending on the number of faces</p>
-        </div>
+<div class="container">
 
-        {% if message %}
-        <div class="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-4 mb-8 text-center">
-            <p class="text-emerald-400 font-medium">{{ message }}</p>
-        </div>
-        {% endif %}
-
-        {% if results %}
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <div class="bg-white/5 backdrop-blur-sm rounded-2xl p-6 border border-white/10">
-                <h2 class="text-2xl font-semibold mb-4 flex items-center gap-2">
-                    <span>Attendance Results</span>
-                    <span class="text-sm bg-emerald-500/20 text-emerald-400 px-3 py-1 rounded-full">{{ results|length }} faces</span>
-                </h2>
-
-                <div class="overflow-x-auto">
-                    <table class="w-full text-sm">
-                        <thead>
-                            <tr class="border-b border-white/10">
-                                <th class="text-left py-3 px-2 text-gray-400 font-medium">#</th>
-                                <th class="text-left py-3 px-2 text-gray-400 font-medium">Name</th>
-                                <th class="text-center py-3 px-2 text-gray-400 font-medium">Match</th>
-                                <th class="text-center py-3 px-2 text-gray-400 font-medium">Status</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for r in results %}
-                            <tr class="border-b border-white/5 hover:bg-white/5 transition-colors">
-                                <td class="py-3 px-2 text-gray-400">{{ r.face_id }}</td>
-                                <td class="py-3 px-2 font-medium">
-                                    {% if r.name == "Unknown" %}
-                                    <span class="text-red-400">Unknown</span>
-                                    {% else %}
-                                    <span class="text-emerald-300">{{ r.name.split('_')[0] }}</span>
-                                    {% endif %}
-                                </td>
-                                <td class="py-3 px-2 text-center">
-                                    <div class="inline-flex items-center gap-1">
-                                        <div class="w-16 bg-gray-700 rounded-full h-1.5">
-                                            <div class="bg-emerald-400 h-1.5 rounded-full" style="width: {{ r.similarity * 100 }}%"></div>
-                                        </div>
-                                        <span class="text-xs text-gray-400">{{ "%.0f"|format(r.similarity * 100) }}%</span>
-                                    </div>
-                                </td>
-                                <td class="py-3 px-2 text-center">
-                                    {% if r.status == "Present" %}
-                                    <span class="inline-flex items-center gap-1 bg-emerald-500/20 text-emerald-400 px-3 py-1 rounded-full text-xs font-medium">
-                                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
-                                        Present
-                                    </span>
-                                    {% else %}
-                                    <span class="inline-flex items-center gap-1 bg-red-500/20 text-red-400 px-3 py-1 rounded-full text-xs font-medium">
-                                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M6 18L18 6M6 6l12 12"/></svg>
-                                        Unknown
-                                    </span>
-                                    {% endif %}
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-
-                <div class="mt-6 pt-4 border-t border-white/10">
-                    <p class="text-sm text-gray-400">
-                        Present: <span class="text-emerald-400 font-semibold">{{ present_count }}</span> |
-                        Unknown: <span class="text-red-400 font-semibold">{{ results|selectattr("status", "equalto", "Unknown")|list|length }}</span>
-                    </p>
-                </div>
-            </div>
-
-            <div>
-                <div class="bg-white/5 backdrop-blur-sm rounded-2xl p-6 border border-white/10 mb-6">
-                    <h2 class="text-2xl font-semibold mb-4">Detected Faces</h2>
-                    <div class="rounded-xl overflow-hidden border border-white/10">
-                        <img src="{{ image }}" class="w-full h-auto" alt="Detected faces">
-                    </div>
-                </div>
-
-                <div class="bg-white/5 backdrop-blur-sm rounded-2xl p-6 border border-white/10">
-                    <h2 class="text-xl font-semibold mb-4">Download Attendance</h2>
-                    <div class="grid grid-cols-3 gap-3">
-                        <a href="/download/csv" class="bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 text-center py-3 px-4 rounded-xl border border-blue-500/30 transition-all hover:scale-105 font-medium text-sm">
-                            CSV
-                        </a>
-                        <a href="/download/excel" class="bg-green-500/20 hover:bg-green-500/30 text-green-400 text-center py-3 px-4 rounded-xl border border-green-500/30 transition-all hover:scale-105 font-medium text-sm">
-                            Excel
-                        </a>
-                        <a href="/download/pdf" class="bg-red-500/20 hover:bg-red-500/30 text-red-400 text-center py-3 px-4 rounded-xl border border-red-500/30 transition-all hover:scale-105 font-medium text-sm">
-                            PDF
-                        </a>
-                    </div>
-                </div>
-            </div>
-        </div>
-        {% endif %}
-
-        <footer class="text-center mt-12 text-gray-600 text-sm">
-            Smart Attendance System v2.0
-        </footer>
+    <div class="brand">
+        <!-- <div class="brand-icon">A</div> -->
+        <h1>Attendace extractor</h1>
+        <p>AI-Powered Face Recognition System</p>
     </div>
 
-    <script>
-        document.getElementById('submitBtn')?.addEventListener('click', function() {
-            const fileInput = document.querySelector('input[type="file"]');
-            if (fileInput && fileInput.files.length > 0) {
-                document.getElementById('loading').classList.remove('hidden');
-            }
-        });
+    <div class="card" id="appCard">
 
-        document.querySelector('input[type="file"]')?.addEventListener('change', function(e) {
-            if (e.target.files.length > 0) {
-                document.getElementById('submitBtn').textContent = 'Process ' + e.target.files[0].name;
-            }
-        });
-    </script>
+        <div class="card-title">Upload Class Photo</div>
+        <div class="card-sub">Drag &amp; drop or select an image</div>
+
+        <form id="uploadForm">
+            <div class="drop-zone" id="dropZone">
+                <span class="dz-icon">+</span>
+                <div class="dz-text">Drop here or <span class="link">browse</span></div>
+                <div class="dz-hint">JPG, PNG, WebP</div>
+                <input type="file" name="file" accept="image/*" id="fileInput" />
+            </div>
+
+            <div class="file-chip" id="fileChip">
+                <span id="fileName"></span>
+                <button type="button" class="close" id="clearFile">&times;</button>
+            </div>
+
+            <button type="submit" class="btn-submit" id="submitBtn">Upload &amp; Process</button>
+
+            <div class="loader" id="loader">
+                <div class="loader-ring"></div>
+                <div class="lt">Processing image</div>
+                <div class="ls">Extracting faces &amp; matching identities</div>
+            </div>
+
+            {% if message %}
+            <div class="msg visible {{ msg_type or 'info' }}" id="msg">{{ message }}</div>
+            {% else %}
+            <div class="msg" id="msg"></div>
+            {% endif %}
+        </form>
+
+        <div class="results {% if results %}visible{% endif %}" id="results">
+            <div class="results-header">
+                <h3>Attendance Record</h3>
+                <span class="count" id="badge">{{ present_count }} present</span>
+            </div>
+
+            <table class="results-table" id="resultsTable">
+                <thead>
+                    <tr><th>#</th><th>Name</th><th>Match</th><th>Status</th></tr>
+                </thead>
+                <tbody>
+                    {% if results %}
+                    {% for r in results %}
+                    <tr>
+                        <td style="padding:8px 6px 8px 0;border-bottom:1px solid rgba(255,255,255,0.015);color:rgba(180,195,220,0.4);font-size:0.75rem;">{{ loop.index }}</td>
+                        <td style="padding:8px 6px 8px 0;border-bottom:1px solid rgba(255,255,255,0.015);font-weight:500;font-size:0.82rem;">{{ r.name.split('_')[0] if r.name != 'Unknown' else 'Unknown' }}</td>
+                        <td style="padding:8px 6px 8px 0;border-bottom:1px solid rgba(255,255,255,0.015);">
+                            <span class="sim-bar">
+                                <span class="sim-track"><span class="sim-fill" style="width:{{ r.similarity * 100 }}%"></span></span>
+                                <span class="sim-pct">{{ "%.0f"|format(r.similarity * 100) }}%</span>
+                            </span>
+                        </td>
+                        <td style="padding:8px 6px 8px 0;border-bottom:1px solid rgba(255,255,255,0.015);">
+                            <span class="status-badge {{ 'present' if r.status == 'Present' else 'unknown' }}">{{ r.status }}</span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    {% endif %}
+                </tbody>
+            </table>
+
+            <div class="results-summary">
+                <span>Faces: <strong id="totalFaces">{{ results|length if results else 0 }}</strong></span>
+                <span>Present: <strong id="presentCount">{{ present_count }}</strong> &middot; Unknown: <strong id="unknownCount">{{ (results|length if results else 0) - present_count }}</strong></span>
+            </div>
+
+            {% if image %}
+            <div class="image-wrap visible" id="imageWrap">
+                <img id="resultImage" src="{{ image }}" alt="Detected faces" />
+            </div>
+            {% endif %}
+
+            {% if results %}
+            <div class="downloads visible" id="downloads">
+                <a href="/download/csv" class="btn-dl">CSV</a>
+                <a href="/download/excel" class="btn-dl">Excel</a>
+                <a href="/download/pdf" class="btn-dl">PDF</a>
+            </div>
+            {% endif %}
+        </div>
+
+    </div>
+
+    <div class="footer">&copy; 2026 Attendace</div>
+
+</div>
+
+<script>
+    const dropZone = document.getElementById('dropZone');
+    const fileInput = document.getElementById('fileInput');
+    const fileChip = document.getElementById('fileChip');
+    const fileName = document.getElementById('fileName');
+    const clearBtn = document.getElementById('clearFile');
+    const submitBtn = document.getElementById('submitBtn');
+    const form = document.getElementById('uploadForm');
+    const loader = document.getElementById('loader');
+
+    let selectedFile = null;
+
+    function setFile(f) {
+        selectedFile = f;
+        if (f) {
+            fileName.textContent = f.name;
+            fileChip.classList.add('visible');
+            submitBtn.classList.add('active');
+            submitBtn.textContent = 'Upload & Process';
+        } else {
+            fileChip.classList.remove('visible');
+            submitBtn.classList.remove('active');
+            submitBtn.textContent = 'Upload & Process';
+        }
+    }
+
+    dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+    dropZone.addEventListener('drop', e => {
+        e.preventDefault(); dropZone.classList.remove('dragover');
+        if (e.dataTransfer.files.length) { fileInput.files = e.dataTransfer.files; setFile(e.dataTransfer.files[0]); }
+    });
+    fileInput.addEventListener('change', () => { if (fileInput.files.length) setFile(fileInput.files[0]); });
+    clearBtn.addEventListener('click', () => { fileInput.value = ''; setFile(null); });
+
+    form.addEventListener('submit', async e => {
+        e.preventDefault();
+        if (!selectedFile) return;
+
+        submitBtn.classList.remove('active');
+        submitBtn.textContent = 'Processing...';
+        loader.classList.add('visible');
+        document.getElementById('msg').className = 'msg';
+
+        const fd = new FormData();
+        fd.append('file', selectedFile);
+
+        try {
+            const resp = await fetch('/upload', { method: 'POST', body: fd });
+            const html = await resp.text();
+            document.open();
+            document.write(html);
+            document.close();
+        } catch (err) {
+            loader.classList.remove('visible');
+            submitBtn.classList.add('active');
+            submitBtn.textContent = 'Try Again';
+            const msg = document.getElementById('msg');
+            msg.className = 'msg visible error';
+            msg.textContent = 'Request failed: ' + err.message;
+        }
+    });
+</script>
+
 </body>
 </html>

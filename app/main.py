@@ -70,25 +70,27 @@ def ensure_embeddings():
 
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
-    return templates.TemplateResponse(request, "index.html", {
-        "results": None,
-        "message": None,
-        "image": None,
-        "present_count": 0,
-    })
+        return templates.TemplateResponse(request, "index.html", {
+            "results": None,
+            "message": None,
+            "msg_type": None,
+            "image": None,
+            "present_count": 0,
+        })
 
 
 @app.post("/upload")
 async def upload(request: Request, file: UploadFile = File(...)):
     if file.filename is None or file.filename == "":
         return templates.TemplateResponse(request, "index.html", {
-            "results": None, "message": "No file uploaded", "image": None, "present_count": 0,
+            "results": None, "message": "No file uploaded", "msg_type": "error", "image": None, "present_count": 0,
         })
 
     if not allowed_file(file.filename):
         return templates.TemplateResponse(request, "index.html", {
             "results": None,
             "message": "Invalid file type. Please upload jpg/jpeg/png/webp",
+            "msg_type": "error",
             "image": None,
             "present_count": 0,
         })
@@ -107,13 +109,16 @@ async def upload(request: Request, file: UploadFile = File(...)):
         if attendance:
             export_all(attendance)
             message = f"Attendance marked. Present: {len(attendance)} | Processed in {elapsed:.1f}s"
+            msg_type = "success"
         else:
             message = f"No known faces recognized. ({elapsed:.1f}s)"
+            msg_type = "info"
 
         return templates.TemplateResponse(request, "index.html", {
             "results": results,
             "present_count": len(attendance),
             "message": message,
+            "msg_type": msg_type,
             "image": output_image,
             "processing_time": round(elapsed, 1),
         })
@@ -122,6 +127,7 @@ async def upload(request: Request, file: UploadFile = File(...)):
         return templates.TemplateResponse(request, "index.html", {
             "results": None,
             "message": f"Error: {str(e)}",
+            "msg_type": "error",
             "image": None,
             "present_count": 0,
         })

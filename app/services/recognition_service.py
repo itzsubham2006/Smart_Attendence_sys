@@ -106,8 +106,18 @@ def recognize_faces(image_path):
         })
 
     os.makedirs(OUTPUT_DIR, exist_ok=True)
-    output_path = os.path.join(OUTPUT_DIR, "result.jpg")
+    ts = int(time.time())
+    output_name = f"result_{ts}.jpg"
+    output_path = os.path.join(OUTPUT_DIR, output_name)
     cv2.imwrite(output_path, image, [cv2.IMWRITE_JPEG_QUALITY, 85])
 
+    # Remove old result images (keep only last 5)
+    old = sorted([f for f in os.listdir(OUTPUT_DIR) if f.startswith("result_") and f.endswith(".jpg")])
+    for f in old[:-5]:
+        try:
+            os.remove(os.path.join(OUTPUT_DIR, f))
+        except Exception:
+            pass
+
     present_students = sorted(present_set)
-    return results, present_students, f"/static/output/result.jpg"
+    return results, present_students, f"/static/output/{output_name}"
