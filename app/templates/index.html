@@ -198,8 +198,8 @@
             <div class="drop-zone" id="dropZone">
                 <span class="dz-icon">+</span>
                 <div class="dz-text">Drop here or <span class="link">browse</span></div>
-                <div class="dz-hint">JPG, PNG, WebP</div>
-                <input type="file" name="file" accept="image/*" id="fileInput" />
+                <div class="dz-hint">JPG, PNG, WebP, BMP, TIFF, HEIC, AVIF</div>
+                <input type="file" name="file" accept="image/jpeg,image/png,image/webp,image/bmp,image/tiff,image/heic,image/heif,image/avif" id="fileInput" />
             </div>
 
             <div class="file-chip" id="fileChip">
@@ -314,14 +314,36 @@
     fileInput.addEventListener('change', () => { if (fileInput.files.length) setFile(fileInput.files[0]); });
     clearBtn.addEventListener('click', () => { fileInput.value = ''; setFile(null); });
 
+    function extractSection(html, id) {
+        const d = new DOMParser().parseFromString(html, 'text/html');
+        const el = d.getElementById(id);
+        return el ? el.innerHTML : null;
+    }
+
+    function extractAttr(html, id, attr) {
+        const d = new DOMParser().parseFromString(html, 'text/html');
+        const el = d.getElementById(id);
+        return el ? el.getAttribute(attr) : null;
+    }
+
+    function extractText(html, id) {
+        const d = new DOMParser().parseFromString(html, 'text/html');
+        const el = d.getElementById(id);
+        return el ? el.textContent : null;
+    }
+
     form.addEventListener('submit', async e => {
         e.preventDefault();
         if (!selectedFile) return;
 
+        const oldBtnText = submitBtn.textContent;
         submitBtn.classList.remove('active');
         submitBtn.textContent = 'Processing...';
         loader.classList.add('visible');
-        document.getElementById('msg').className = 'msg';
+
+        const msgEl = document.getElementById('msg');
+        msgEl.className = 'msg';
+        msgEl.textContent = '';
 
         const fd = new FormData();
         fd.append('file', selectedFile);
@@ -329,17 +351,36 @@
         try {
             const resp = await fetch('/upload', { method: 'POST', body: fd });
             const html = await resp.text();
-            document.open();
-            document.write(html);
-            document.close();
+
+            // Message
+            const msgHtml = extractSection(html, 'msg');
+            if (msgHtml !== null) {
+                msgEl.innerHTML = msgHtml;
+                msgEl.className = extractAttr(html, 'msg', 'class') || 'msg';
+            }
+
+            // Results section
+            const resultsHtml = extractSection(html, 'results');
+            const resultsEl = document.getElementById('results');
+            if (resultsHtml !== null) {
+                resultsEl.innerHTML = resultsHtml;
+                resultsEl.classList.add('visible');
+            } else {
+                resultsEl.classList.remove('visible');
+            }
+
+            // Clear the file selection so user can upload another
+            fileInput.value = '';
+            setFile(null);
+
         } catch (err) {
-            loader.classList.remove('visible');
-            submitBtn.classList.add('active');
-            submitBtn.textContent = 'Try Again';
-            const msg = document.getElementById('msg');
-            msg.className = 'msg visible error';
-            msg.textContent = 'Request failed: ' + err.message;
+            msgEl.className = 'msg visible error';
+            msgEl.textContent = 'Request failed: ' + err.message;
         }
+
+        loader.classList.remove('visible');
+        submitBtn.classList.add('active');
+        submitBtn.textContent = 'Upload Another Photo';
     });
 </script>
 

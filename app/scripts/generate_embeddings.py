@@ -17,7 +17,7 @@ THRESHOLD_PATH = os.path.join(EMBEDDINGS_PATH, "threshold.pkl")
 
 MODEL_NAME = "ArcFace"
 DETECTOR_BACKEND = "retinaface"
-VALID_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
+VALID_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".webp", ".tiff", ".tif", ".heic", ".heif", ".avif"}
 
 os.makedirs(EMBEDDINGS_PATH, exist_ok=True)
 

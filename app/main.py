@@ -22,7 +22,7 @@ EXPORTS_FOLDER = os.path.join(PROJECT_ROOT, "exports")
 FAISS_INDEX = os.path.join(EMBEDDINGS_FOLDER, "faiss_index.bin")
 LABELS_FILE = os.path.join(EMBEDDINGS_FOLDER, "labels.pkl")
 
-ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "webp"}
+ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "webp", "bmp", "tiff", "tif", "heic", "heif", "avif"}
 
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(EMBEDDINGS_FOLDER, exist_ok=True)
