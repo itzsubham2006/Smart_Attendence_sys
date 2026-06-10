@@ -1,61 +1,56 @@
 import os
-import cv2
 import pickle
+import time
 import numpy as np
 import faiss
+import cv2
 from deepface import DeepFace
 
-INDEX_PATH = "embeddings/faiss_index.bin"
-LABELS_PATH = "embeddings/labels.pkl"
-OUTPUT_IMAGE_PATH = "static/output/result.jpg"
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+INDEX_PATH = os.path.join(PROJECT_ROOT, "embeddings", "faiss_index.bin")
+LABELS_PATH = os.path.join(PROJECT_ROOT, "embeddings", "labels.pkl")
+THRESHOLD_PATH = os.path.join(PROJECT_ROOT, "embeddings", "threshold.pkl")
+OUTPUT_DIR = os.path.join(PROJECT_ROOT, "static", "output")
 
 MODEL_NAME = "ArcFace"
 DETECTOR_BACKEND = "retinaface"
-ENFORCE_DETECTION = True
-ALIGN = True
-NORMALIZATION = "ArcFace"
+DEFAULT_THRESHOLD = 0.28
 
-# Tune between 0.35 and 0.45 based on your classroom data
-COSINE_THRESHOLD = 0.40
+_index = None
+_labels = None
+_threshold = DEFAULT_THRESHOLD
 
 
 def _load_index_and_labels():
-    if not os.path.exists(INDEX_PATH):
-        raise FileNotFoundError(f"Missing index: {INDEX_PATH}")
-    if not os.path.exists(LABELS_PATH):
-        raise FileNotFoundError(f"Missing labels: {LABELS_PATH}")
-
-    index = faiss.read_index(INDEX_PATH)
+    global _index, _labels, _threshold
+    if _index is not None:
+        return _index, _labels, _threshold
+    if not os.path.exists(INDEX_PATH) or not os.path.exists(LABELS_PATH):
+        raise FileNotFoundError("FAISS index or labels not found. Run generate_embeddings first.")
+    _index = faiss.read_index(INDEX_PATH)
     with open(LABELS_PATH, "rb") as f:
-        labels = pickle.load(f)
+        _labels = pickle.load(f)
+    if os.path.exists(THRESHOLD_PATH):
+        with open(THRESHOLD_PATH, "rb") as f:
+            _threshold = pickle.load(f)
+    if _index.ntotal != len(_labels):
+        raise ValueError(f"Index ({_index.ntotal}) and labels ({len(_labels)}) mismatch.")
+    return _index, _labels, _threshold
 
-    if index.ntotal != len(labels):
-        raise ValueError("Index and labels mismatch. Re-run embeddings generation.")
 
-    return index, labels
-
-
-def recognize_faces(image_path, threshold=COSINE_THRESHOLD):
-    """
-    Returns:
-      results: list[dict] per-face recognition details
-      present_students: list[str] unique recognized student names
-      output_image_path: str path for template image src
-    """
-    index, labels = _load_index_and_labels()
-
+def recognize_faces(image_path):
+    index, labels, threshold = _load_index_and_labels()
     image = cv2.imread(image_path)
     if image is None:
         raise ValueError(f"Could not read image: {image_path}")
 
-    # Detect all faces + generate embeddings
     faces = DeepFace.represent(
         img_path=image_path,
         model_name=MODEL_NAME,
         detector_backend=DETECTOR_BACKEND,
-        enforce_detection=ENFORCE_DETECTION,
-        align=ALIGN,
-        normalization=NORMALIZATION
+        enforce_detection=False,
+        align=True,
+        normalization="ArcFace",
     )
 
     present_set = set()
@@ -65,56 +60,54 @@ def recognize_faces(image_path, threshold=COSINE_THRESHOLD):
         emb = np.asarray(face["embedding"], dtype=np.float32).reshape(1, -1)
         faiss.normalize_L2(emb)
 
-        scores, indices = index.search(emb, 1)
-        similarity = float(scores[0][0])
-        best_idx = int(indices[0][0])
+        scores, indices = index.search(emb, 3)
+        valid = [(s, idx) for s, idx in zip(scores[0], indices[0]) if idx >= 0 and s >= threshold]
 
-        face_confidence = float(face.get("face_confidence", 0.0))
-
-        if best_idx >= 0 and similarity >= threshold:
-            name = labels[best_idx]
-            status = "Present"
-            present_set.add(name)
-            color = (0, 255, 0)
-        else:
+        if not valid:
             name = "Unknown"
             status = "Unknown"
             color = (0, 0, 255)
+            final_similarity = 0.0
+        else:
+            from collections import Counter
+            label_votes = Counter()
+            for s, idx in valid:
+                label_votes[labels[idx]] += s
+            name = label_votes.most_common(1)[0][0]
+            final_similarity = max(s for s, _ in valid)
+            status = "Present"
+            present_set.add(name)
+            color = (0, 255, 0)
 
         area = face.get("facial_area", {})
         x = int(area.get("x", 0))
         y = int(area.get("y", 0))
         w = int(area.get("w", 0))
         h = int(area.get("h", 0))
+        face_confidence = float(face.get("face_confidence", 0.0))
 
         cv2.rectangle(image, (x, y), (x + w, y + h), color, 2)
+        label_text = f"{name} ({final_similarity:.2f})"
+        (tw, th), _ = cv2.getTextSize(label_text, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 2)
+        cv2.rectangle(image, (x, y - th - 6), (x + tw + 4, y), color, -1)
         cv2.putText(
-            image,
-            f"{name} {similarity:.2f}",
-            (x, max(20, y - 8)),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.6,
-            color,
-            2,
-            cv2.LINE_AA
+            image, label_text,
+            (x + 2, y - 4),
+            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2, cv2.LINE_AA,
         )
 
-        results.append(
-            {
-                "face_id": len(results) + 1,
-                "name": name,
-                "status": status,
-                "similarity": round(similarity, 4),
-                "confidence": round(face_confidence * 100.0, 2),
-                "x": x,
-                "y": y,
-                "w": w,
-                "h": h,
-            }
-        )
+        results.append({
+            "face_id": len(results) + 1,
+            "name": name,
+            "status": status,
+            "similarity": round(final_similarity, 4),
+            "confidence": round(face_confidence * 100.0, 2),
+            "x": x, "y": y, "w": w, "h": h,
+        })
 
-    os.makedirs(os.path.dirname(OUTPUT_IMAGE_PATH), exist_ok=True)
-    cv2.imwrite(OUTPUT_IMAGE_PATH, image)
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
+    output_path = os.path.join(OUTPUT_DIR, "result.jpg")
+    cv2.imwrite(output_path, image, [cv2.IMWRITE_JPEG_QUALITY, 85])
 
-    present_students = sorted(list(present_set))
-    return results, present_students, f"/{OUTPUT_IMAGE_PATH}"
+    present_students = sorted(present_set)
+    return results, present_students, f"/static/output/result.jpg"

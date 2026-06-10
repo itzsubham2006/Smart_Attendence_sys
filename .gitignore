@@ -1,14 +1,12 @@
-# ignore venv (virtual environment)
-
+.venv-wsl
+__pycache__/
 *.pyc
-
-venv/
-
-__pycache__
-
-
+.DS_Store
 dataset/
-
-app/models
-
-uploads
+uploads/
+embeddings/
+exports/
+static/output/
+.env
+notebooks/
+venv

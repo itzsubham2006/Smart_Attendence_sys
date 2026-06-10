@@ -1,86 +1,66 @@
-# import os
-# import cv2
-# import numpy as np
+import os
+import cv2
+import numpy as np
 
-# DATASET_PATH = "dataset"
-# AUGMENTED_COUNT = 15  
-
-# def augment_image(image):
-#     augmented_images = []
-
-#     h, w = image.shape[:2]
-
-#     for i in range(AUGMENTED_COUNT):
-#         img = image.copy()
-
-       
-#         angle = np.random.randint(-15, 15)
-#         M = cv2.getRotationMatrix2D((w//2, h//2), angle, 1)
-#         img = cv2.warpAffine(img, M, (w, h))
-
-       
-#         value = np.random.randint(-30, 30)
-#         hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
-#         hsv[:, :, 2] = cv2.add(hsv[:, :, 2], value)
-#         img = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
-
-       
-#         if np.random.rand() > 0.5:
-#             img = cv2.flip(img, 1)
-
-     
-#         zoom = np.random.uniform(0.9, 1.1)
-#         center_x, center_y = w // 2, h // 2
-#         new_w, new_h = int(w * zoom), int(h * zoom)
-
-#         x1 = max(center_x - new_w // 2, 0)
-#         y1 = max(center_y - new_h // 2, 0)
-#         x2 = min(center_x + new_w // 2, w)
-#         y2 = min(center_y + new_h // 2, h)
-
-#         img = img[y1:y2, x1:x2]
-#         img = cv2.resize(img, (w, h))
-
-       
-#         if np.random.rand() > 0.7:
-#             img = cv2.GaussianBlur(img, (5, 5), 0)
-
-#         augmented_images.append(img)
-
-#     return augmented_images
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+DATASET_PATH = os.path.join(PROJECT_ROOT, "dataset")
 
 
-# def process_dataset():
-#     for person in os.listdir(DATASET_PATH):
-#         person_path = os.path.join(DATASET_PATH, person)
+def augment_image(image):
+    augmented = []
+    h, w = image.shape[:2]
 
-#         if not os.path.isdir(person_path):
-#             continue
+    # Original
+    augmented.append(image)
 
-#         images = os.listdir(person_path)
+    # Horizontal flip
+    augmented.append(cv2.flip(image, 1))
 
-#         print(f"Processing {person}...")
+    # Brightness variations
+    for factor in [0.85, 1.15]:
+        hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV).astype(np.float32)
+        hsv[:, :, 2] = np.clip(hsv[:, :, 2] * factor, 0, 255)
+        augmented.append(cv2.cvtColor(hsv.astype(np.uint8), cv2.COLOR_HSV2BGR))
 
-#         count = 0
+    # Contrast variations
+    for alpha in [0.9, 1.1]:
+        augmented.append(cv2.convertScaleAbs(image, alpha=alpha, beta=0))
 
-#         for img_name in images:
-#             img_path = os.path.join(person_path, img_name)
-#             image = cv2.imread(img_path)
+    return augmented
 
-#             if image is None:
-#                 continue
 
-#             augmented_images = augment_image(image)
+def process_dataset():
+    total = 0
+    for person in os.listdir(DATASET_PATH):
+        person_path = os.path.join(DATASET_PATH, person)
+        if not os.path.isdir(person_path):
+            continue
 
-#             for aug_img in augmented_images:
-#                 new_name = f"aug_{count}.jpg"
-#                 save_path = os.path.join(person_path, new_name)
+        images = [f for f in os.listdir(person_path) if f.lower().endswith(('.jpg', '.jpeg', '.png', '.webp'))]
+        if not images:
+            continue
 
-#                 cv2.imwrite(save_path, aug_img)
-#                 count += 1
+        print(f"Processing {person} ({len(images)} images)...")
+        count = 0
 
-#         print(f"{person} now has augmented images!")
+        for img_name in images:
+            img_path = os.path.join(person_path, img_name)
+            image = cv2.imread(img_path)
+            if image is None:
+                continue
 
-# if __name__ == "__main__":
-#     process_dataset()
-    
+            variants = augment_image(image)
+            for aug_img in variants[1:]:
+                aug_name = f"aug_{count}_{img_name}"
+                save_path = os.path.join(person_path, aug_name)
+                cv2.imwrite(save_path, aug_img)
+                count += 1
+
+        total += count
+        print(f"  Added {count} augmented images for {person}")
+
+    print(f"\nTotal augmented images created: {total}")
+
+
+if __name__ == "__main__":
+    process_dataset()
