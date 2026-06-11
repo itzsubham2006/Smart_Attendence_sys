@@ -101,7 +101,7 @@ async def upload(request: Request, file: UploadFile = File(...)):
         content = await file.read()
         await f.write(content)
 
-    # Convert HEIC/HEIF to JPEG (OpenCV/PIL can't read them natively)
+  
     ext = file.filename.rsplit(".", 1)[-1].lower() if "." in file.filename else ""
     if ext in ("heic", "heif"):
         try:

@@ -10,19 +10,19 @@ def augment_image(image):
     augmented = []
     h, w = image.shape[:2]
 
-    # Original
+    
     augmented.append(image)
 
-    # Horizontal flip
+  
     augmented.append(cv2.flip(image, 1))
 
-    # Brightness variations
+   
     for factor in [0.85, 1.15]:
         hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV).astype(np.float32)
         hsv[:, :, 2] = np.clip(hsv[:, :, 2] * factor, 0, 255)
         augmented.append(cv2.cvtColor(hsv.astype(np.uint8), cv2.COLOR_HSV2BGR))
 
-    # Contrast variations
+   
     for alpha in [0.9, 1.1]:
         augmented.append(cv2.convertScaleAbs(image, alpha=alpha, beta=0))
 
