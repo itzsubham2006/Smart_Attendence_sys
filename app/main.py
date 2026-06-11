@@ -101,6 +101,24 @@ async def upload(request: Request, file: UploadFile = File(...)):
         content = await file.read()
         await f.write(content)
 
+    # Convert HEIC/HEIF to JPEG (OpenCV/PIL can't read them natively)
+    ext = file.filename.rsplit(".", 1)[-1].lower() if "." in file.filename else ""
+    if ext in ("heic", "heif"):
+        try:
+            from PIL import Image
+            from pillow_heif import register_heif_opener
+            register_heif_opener()
+            img = Image.open(file_path)
+            jpg_path = file_path.rsplit(".", 1)[0] + ".jpg"
+            img.save(jpg_path, "JPEG", quality=92)
+            os.remove(file_path)
+            file_path = jpg_path
+        except Exception as e:
+            return templates.TemplateResponse(request, "index.html", {
+                "results": None, "message": f"Could not process HEIC image: {str(e)}",
+                "msg_type": "error", "image": None, "present_count": 0,
+            })
+
     try:
         start = time.time()
         results, attendance, output_image = recognize_faces(file_path)

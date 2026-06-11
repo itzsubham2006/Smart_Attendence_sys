@@ -5,8 +5,10 @@ __pycache__/
 dataset/
 uploads/
 embeddings/
-exports/
+exports
 static/output/
 .env
 notebooks/
 venv
+server_err.log
+server_out.log
